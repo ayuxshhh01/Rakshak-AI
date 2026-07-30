@@ -1,0 +1,24 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Django
+
+.env
+
+# IDE
+.idea/
+.vscode/
+
+# Flutter
+build/
+.dart_tool/
+
+tourist_app/build_output.txt
+build/
+
+build/
+*.log
+*.txt

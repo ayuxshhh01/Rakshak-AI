@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorities Portal - Smart Tourist Safety</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .animate-pulse-fast { animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+        .heatmap-dot { position: absolute; border-radius: 50%; mix-blend-mode: multiply; transition: all 0.5s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Configuration ---
+        const API_BASE_URL = "http://127.0.0.1:8000/api";
+        const AI_API_BASE_URL = "http://127.0.0.1:8001";
+        const WEBSOCKET_URL = "ws://127.0.0.1:8000";
+
+        // --- Mock Data (as a fallback) ---
+        const MOCK_TOURISTS = [
+            { id: 1, username: 'Priya Sharma (mock)', last_location: {lat: 17.6599, lon: 75.9064}, status: 'safe' },
+            { id: 2, username: 'Amit Singh (mock)', last_location: {lat: 17.6802, lon: 75.9010}, status: 'safe' },
+        ];
+        
+        // --- React Components ---
+
+        const AlertCard = ({ alert }) => {
+            const getPriorityStyles = () => {
+                const type = alert.alert_type?.toLowerCase() || '';
+                if (type.includes('sos')) return { style: 'border-red-500 bg-red-50', icon: <SOSIcon /> };
+                if (type.includes('geofence')) return { style: 'border-yellow-500 bg-yellow-50', icon: <GeoFenceIcon /> };
+                if (type.includes('inactivity')) return { style: 'border-blue-500 bg-blue-50', icon: <InactivityIcon /> };
+                if (type.includes('risk')) return { style: 'border-purple-500 bg-purple-50', icon: <RiskIcon /> };
+                return { style: 'border-gray-500 bg-gray-50', icon: <InactivityIcon /> };
+            };
+
+            const { style, icon } = getPriorityStyles();
+            const isHighPriority = alert.alert_type?.toLowerCase().includes('sos');
+
+            return (
+                <div className={`p-4 mb-3 rounded-lg shadow-md border-l-4 ${style} ${isHighPriority ? 'animate-pulse-fast' : ''}`}>
+                    <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">{icon}</div>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center">
+                                <h3 className="font-bold text-base text-gray-800">{alert.alert_type || 'New Alert'}</h3>
+                                <span className="text-xs text-gray-500">{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                            <p className="text-gray-700 text-sm">User: <span className="font-semibold">{alert.user}</span></p>
+                            <p className="text-xs text-gray-600">Location: {alert.location?.lat?.toFixed(4)}, {alert.location?.lon?.toFixed(4)}</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const App = () => {
+          const [alerts, setAlerts] = useState([]);
+          const [tourists, setTourists] = useState([]);
+          const [heatmapData, setHeatmapData] = useState([]);
+          const [mapLayer, setMapLayer] = useState('clusters');
+          const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+          const audioRef = useRef(null);
+
+          const fetchTourists = async () => {
+              // TODO for Backend Team: Create a new endpoint at /api/tourists/ in Django.
+              // This view should be a ListAPIView that returns all CustomUser objects
+              // with a serializer that includes username and a new `last_location` field.
+              // For now, we fall back to mock data if the fetch fails.
+              try {
+                  console.log("Fetching live tourist data from backend...");
+                  // This requires an authenticated session or a public endpoint for the dashboard.
+                  // const response = await fetch(`${API_BASE_URL}/tourists/`);
+                  // if (!response.ok) throw new Error('Failed to fetch');
+                  // const data = await response.json();
+                  // setTourists(data);
+                  console.log("Using mock data as a fallback.");
+                  setTourists(MOCK_TOURISTS);
+              } catch (e) {
+                  console.error("Failed to fetch live tourist data, using fallback:", e);
+                  setTourists(MOCK_TOURISTS);
+              }
+          };
+
+          const fetchHeatmapData = async (layer) => {
+              try {
+                  if (layer === 'clusters') {
+                      console.log("Generating heatmap for tourist clusters...");
+                      const points = tourists.map(t => ({...t.last_location, value: 50}));
+                      setHeatmapData(points);
+                  } else if (layer === 'risk') {
+                      console.log("Fetching predictive risk data from AI service...");
+                      const response = await fetch(`${AI_API_BASE_URL}/predict-risk-zones`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ lat: 17.6, lon: 75.9 }) // Using Solapur as an example location
+                      });
+                      const data = await response.json();
+                      const points = data.predicted_hotspots.map(h => ({...h, value: 100}));
+                      setHeatmapData(points);
+                  }
+              } catch (e) {
+                  console.error(`Failed to fetch heatmap data for ${layer}:`, e);
+                  setHeatmapData([]);
+              }
+          };
+
+          useEffect(() => {
+              fetchTourists();
+              const socket = io(WEBSOCKET_URL, {
+                  path: '/ws/alerts/',
+                  transports: ['websocket'],
+              });
+
+              socket.on('connect', () => { setConnectionStatus('Connected'); });
+              socket.on('disconnect', () => { setConnectionStatus('Disconnected'); });
+              socket.on('connect_error', (err) => { 
+                  console.error('WebSocket connection error:', err);
+                  setConnectionStatus('Error'); 
+              });
+              socket.on('alert', (newAlert) => {
+                  const alertData = newAlert.alert || newAlert;
+                  console.log('Received new alert via WebSocket:', alertData);
+                  setAlerts(prev => [alertData, ...prev]);
+                  if (alertData.alert_type?.toLowerCase().includes('sos')) {
+                      audioRef.current?.play();
+                  }
+                  setTourists(prev => prev.map(t => t.username === alertData.user ? {...t, status: 'alert'} : t));
+              });
+
+              return () => socket.disconnect();
+          }, []);
+
+          useEffect(() => {
+              fetchHeatmapData(mapLayer);
+          }, [mapLayer, tourists]);
+
+          return (
+            <div className="flex h-screen bg-gray-100 font-sans">
+              <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+              <Sidebar connectionStatus={connectionStatus} />
+              <MainContent alerts={alerts} tourists={tourists} mapLayer={mapLayer} setMapLayer={setMapLayer} heatmapData={heatmapData} />
+            </div>
+          );
+        };
+
+        const Sidebar = ({ connectionStatus }) => (
+            <aside className="w-64 bg-gray-800 text-white flex flex-col flex-shrink-0">
+                <div className="p-4 border-b border-gray-700 flex items-center space-x-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-teal-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                    <div>
+                        <h2 className="text-xl font-bold">Tourist Safety</h2>
+                        <span className="text-xs text-gray-400">Authorities Portal</span>
+                    </div>
+                </div>
+                <nav className="flex-1 p-2">
+                  <a href="#" className="block p-3 rounded bg-teal-600 font-semibold">Live Operations</a>
+                </nav>
+                <div className="p-4 border-t border-gray-700">
+                  <p className="text-sm">Status: <span className={connectionStatus === 'Connected' ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>{connectionStatus}</span></p>
+                </div>
+            </aside>
+        );
+
+        const MainContent = ({ alerts, tourists, mapLayer, setMapLayer, heatmapData }) => (
+             <main className="flex-1 flex flex-col">
+                <header className="bg-white shadow-md p-4">
+                  <h1 className="text-2xl font-semibold text-gray-800">Police & Tourism Dashboard</h1>
+                </header>
+                <div className="flex-1 flex p-4 gap-4 overflow-hidden">
+                  <div className="flex-1 flex flex-col bg-white rounded-lg shadow-lg">
+                    <div className="p-4 border-b flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-gray-700">Geospatial Intelligence View</h3>
+                        <div className="flex gap-2">
+                           <button onClick={() => setMapLayer('clusters')} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${mapLayer === 'clusters' ? 'bg-teal-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Tourist Clusters</button>
+                           <button onClick={() => setMapLayer('risk')} className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${mapLayer === 'risk' ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Predictive Risk AI</button>
+                        </div>
+                    </div>
+                    {/* Map Simulation */}
+                    <div className="flex-1 bg-gray-500 relative flex items-center justify-center overflow-hidden" style={{backgroundImage: `url(https://www.lib.utexas.edu/maps/historical/india_rel_1985.jpg)`, backgroundSize: 'cover'}}>
+                         {/* Heatmap Simulation */}
+                         {heatmapData.map((point, i) => (
+                             <div key={i} className="heatmap-dot" style={{
+                                 top: `${(point.lat - 17.5) * 200}%`, // Adjust mapping to fit image
+                                 left: `${(point.lon - 75.8) * 200}%`,
+                                 width: `${point.value}px`,
+                                 height: `${point.value}px`,
+                                 backgroundColor: mapLayer === 'risk' ? 'rgba(255, 0, 0, 0.4)' : 'rgba(0, 255, 255, 0.4)',
+                                 transform: 'translate(-50%, -50%)',
+                             }}></div>
+                         ))}
+                         {/* Tourist Markers */}
+                         {tourists.map(t => {
+                             const isAlertUser = t.status === 'alert';
+                             return (
+                                 <div key={t.id} className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group" style={{ top: `${(t.last_location.lat - 17.5) * 200}%`, left: `${(t.last_location.lon - 75.8) * 200}%` }}>
+                                     <div className={`w-4 h-4 rounded-full border-2 border-white shadow-lg ${isAlertUser ? 'bg-red-500 animate-pulse' : (t.status === 'safe' ? 'bg-green-500' : 'bg-yellow-500')}`}></div>
+                                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t.username}</div>
+                                 </div>
+                             );
+                         })}
+                    </div>
+                  </div>
+                  <div className="w-96 bg-white rounded-lg shadow-lg flex flex-col flex-shrink-0">
+                    <div className="p-4 border-b">
+                      <h3 className="text-xl font-bold text-gray-700">Real-time Alerts Feed</h3>
+                    </div>
+                    <div className="flex-1 p-2 overflow-y-auto">
+                      {alerts.length > 0 ? alerts.map((alert, i) => <AlertCard key={i} alert={alert} />) : 
+                        <div className="text-center text-gray-500 p-8">
+                           <SystemNormalIcon />
+                           <p className="mt-2 font-semibold">System Normal</p>
+                           <p className="text-sm">No active alerts.</p>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </main>
+        );
+        
+        // Icon Components for AlertCard
+        const SOSIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h._01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+        const GeoFenceIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        const InactivityIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        const RiskIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>;
+        const SystemNormalIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+

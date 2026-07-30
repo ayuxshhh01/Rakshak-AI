@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: tourist-backend
+    env: docker
+    plan: free
+    dockerContext: .
+    dockerfilePath: ./backend/Dockerfile.production
+    healthCheckPath: /health
+    envVars:
+      - key: DEBUG
+        value: "True"
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: REDIS_URL
+        value: redis://redis:6379/0
+
+  - type: redis
+    name: tourist-redis
+    plan: free
+    ipAllowList: []

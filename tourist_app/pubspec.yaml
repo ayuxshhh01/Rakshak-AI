@@ -1,0 +1,51 @@
+name: tourist_app
+description: The official mobile application for the Smart Tourist Safety System.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  # For making API calls to the Django backend
+  http: ^1.2.1
+  # For speech to Text for help help help feature
+
+  # For saving the auth token locally on the device
+  shared_preferences: ^2.2.3
+
+  # For displaying the live map and getting GPS data
+  google_maps_flutter: ^2.6.1
+  geolocator: ^14.0.2
+  geolocator_windows: ^0.2.3
+  connectivity_plus: ^7.1.0
+  url_launcher: ^6.3.0
+
+  # For robust state management (handling login status, location updates, etc.)
+  flutter_bloc: ^9.1.1
+  bloc: ^9.0.0
+  equatable: ^2.0.5
+
+  # Standard iOS icons
+  cupertino_icons: ^1.0.6
+  speech_to_text: ^7.3.0
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true

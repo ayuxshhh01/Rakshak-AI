@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tourist Safety Portal Dashboard</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDp7n_QVHxPmQ3N8vW26ubQUXxqsIqJnr4"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui; background: #f0f2f5; }
+        
+        .main-container { display: flex; height: 100vh; }
+        
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar h1 { font-size: 24px; margin-bottom: 30px; font-weight: bold; }
+        .sidebar-btn {
+            width: 100%;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            font-size: 14px;
+        }
+        .sidebar-btn:hover { background: rgba(255,255,255,0.3); transform: translateX(5px); }
+        .sidebar-btn.active { background: rgba(255,255,255,0.4); border-color: white; }
+        
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .header h2 { font-size: 28px; font-weight: bold; color: #333; }
+        .header-actions { display: flex; gap: 10px; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #764ba2; }
+        .btn-danger { background: #f1416c; color: white; }
+        .btn-danger:hover { background: #e83658; }
+        
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .map-container {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        #map { width: 100%; height: 100%; }
+        
+        .map-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10;
+            display: flex;
+            gap: 5px;
+        }
+        
+        .map-btn {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .map-btn:hover { background: #764ba2; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-left: 4px solid #667eea;
+        }
+        .stat-card.danger { border-left-color: #f1416c; }
+        .stat-card.warning { border-left-color: #ff9a56; }
+        .stat-card.success { border-left-color: #11998e; }
+        
+        .stat-label { font-size: 12px; color: #999; text-transform: uppercase; font-weight: bold; }
+        .stat-value { font-size: 32px; font-weight: bold; color: #333; margin-top: 10px; }
+        
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        
+        .section h3 { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        
+        .alerts-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .alert-item {
+            padding: 15px;
+            border-left: 4px solid #ff9a56;
+            background: #fef5f0;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .alert-item:hover { background: #fde8df; transform: translateX(5px); }
+        .alert-item.danger { border-left-color: #f1416c; background: #f8d7da; }
+        .alert-item.danger:hover { background: #f5c6ce; }
+        
+        .alert-header { display: flex; justify-content: space-between; }
+        .alert-user { font-weight: bold; color: #333; }
+        .alert-type { font-size: 12px; background: #667eea; color: white; padding: 2px 8px; border-radius: 3px; }
+        .alert-details { font-size: 13px; color: #666; margin-top: 5px; }
+        .alert-time { font-size: 11px; color: #999; margin-top: 5px; }
+        
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 13px;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        
+        tr:hover { background: #f9f9f9; }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .badge-danger { background: #f1416c; color: white; }
+        .badge-warning { background: #ff9a56; color: white; }
+        .badge-success { background: #11998e; color: white; }
+        
+        /* Side Panel */
+        .side-panel {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            padding: 20px;
+        }
+        
+        .side-panel.active { right: 0; }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .panel-header h3 { font-size: 20px; font-weight: bold; }
+        .panel-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .panel-section {
+            margin-bottom: 20px;
+        }
+        
+        .panel-label { font-size: 12px; color: #999; text-transform: uppercase; font-weight: bold; margin-bottom: 8px; }
+        .panel-value { font-size: 14px; color: #333; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .loading { text-align: center; padding: 20px; }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <h1>🛡️ Tourist Safety</h1>
+            <div style="margin-bottom: 20px;">
+                <h4 style="font-size: 12px; opacity: 0.8; text-transform: uppercase; margin-bottom: 10px;">Dashboard</h4>
+                <button class="sidebar-btn active" onclick="showSection('overview')">📊 Overview</button>
+                <button class="sidebar-btn" onclick="showSection('alerts')">🚨 Alerts & Incidents</button>
+                <button class="sidebar-btn" onclick="showSection('tourists')">👥 Tourists</button>
+                <button class="sidebar-btn" onclick="showSection('sos')">🆘 SOS Panel</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="font-size: 12px; opacity: 0.8; text-transform: uppercase; margin-bottom: 10px;">Analytics</h4>
+                <button class="sidebar-btn" onclick="showSection('heatmap')">🔥 Incident Heatmap</button>
+                <button class="sidebar-btn" onclick="showSection('zones')">🗺️ Safe Zones</button>
+                <button class="sidebar-btn" onclick="showSection('responders')">👮 Responders</button>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4 style="font-size: 12px; opacity: 0.8; text-transform: uppercase; margin-bottom: 10px;">Reports</h4>
+                <button class="sidebar-btn" onclick="showSection('logs')">📋 Audit Logs</button>
+                <button class="sidebar-btn" onclick="showSection('stats')">📈 Statistics</button>
+            </div>
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+                <button class="btn btn-danger" style="width: 100%;" onclick="triggerSOS()">
+                    🚨 EMERGENCY SOS
+                </button>
+            </div>
+        </div>
+        
+        <!-- MAIN CONTENT -->
+        <div class="content">
+            <!-- HEADER -->
+            <div class="header">
+                <h2>Smart Tourist Safety Portal</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                    <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
+                </div>
+            </div>
+            
+            <!-- MAIN CONTENT AREA -->
+            <div class="main-content">
+                
+                <!-- OVERVIEW SECTION -->
+                <div id="section-overview" class="section-content">
+                    <!-- MAP -->
+                    <div class="map-container">
+                        <div id="map"></div>
+                        <div class="map-controls">
+                            <button class="map-btn" onclick="toggleGeozones()">🗺️ Zones</button>
+                            <button class="map-btn" onclick="toggleRiskZones()">⚠️ Risk</button>
+                            <button class="map-btn" onclick="centerMap()">📍 Center</button>
+                        </div>
+                        
+                        <!-- LEGEND -->
+                        <div style="position: absolute; bottom: 15px; left: 15px; background: white; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10; font-size: 12px;">
+                            <div style="margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 8px;">LEGEND</div>
+                            <div style="margin-bottom: 8px;"><span style="display: inline-block; width: 16px; height: 16px; background: #f1416c; border-radius: 50%; margin-right: 8px;"></span><strong>Critical Risk</strong> (80+)</div>
+                            <div style="margin-bottom: 8px;"><span style="display: inline-block; width: 16px; height: 16px; background: #ff9a56; border-radius: 50%; margin-right: 8px;"></span><strong>High Risk</strong> (60-79)</div>
+                            <div style="margin-bottom: 8px;"><span style="display: inline-block; width: 16px; height: 16px; background: #FFD93D; border-radius: 50%; margin-right: 8px;"></span><strong>Medium Risk</strong> (40-59)</div>
+                            <div style="margin-bottom: 8px;"><span style="display: inline-block; width: 16px; height: 16px; background: #51CF66; border-radius: 50%; margin-right: 8px;"></span><strong>Low Risk</strong> (&lt;40)</div>
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                                <div style="margin-bottom: 6px;">🟢 Safe Tourist</div>
+                                <div>🔴 Alert Tourist</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- STATS CARDS -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Active Tourists</div>
+                            <div class="stat-value" id="stat-active-tourists">-</div>
+                        </div>
+                        <div class="stat-card danger">
+                            <div class="stat-label">Active SOS</div>
+                            <div class="stat-value" id="stat-sos">-</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-label">Alerts (24h)</div>
+                            <div class="stat-value" id="stat-alerts">-</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-label">Safe Tourists</div>
+                            <div class="stat-value" id="stat-safe">-</div>
+                        </div>
+                    </div>
+                    
+                    <!-- RECENT ALERTS -->
+                    <div class="section">
+                        <h3>⚡ Recent Alerts</h3>
+                        <div class="alerts-list" id="recent-alerts">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ALERTS SECTION -->
+                <div id="section-alerts" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>All Alerts & Incidents</h3>
+                        <div style="margin-bottom: 15px;">
+                            <input type="text" id="alert-filter" placeholder="Filter by type (SOS, GeoFence, Risk, e-FIR)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tourist</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Time</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alerts-table">
+                                    <tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- TOURISTS SECTION -->
+                <div id="section-tourists" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>Tourist Profiles</h3>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Safety Score</th>
+                                        <th>Last Location</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tourists-table">
+                                    <tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- LOGS SECTION -->
+                <div id="section-logs" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>Audit Logs</h3>
+                        <div id="logs-list">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SOS PANEL SECTION -->
+                <div id="section-sos" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>🆘 Active SOS Alerts</h3>
+                        <div style="margin-bottom: 15px;">
+                            <button class="btn btn-danger" style="width: 100%; padding: 15px; font-size: 18px;" onclick="triggerSOS()">
+                                🚨 TRIGGER SOS ALERT
+                            </button>
+                        </div>
+                        <div id="sos-alerts" style="max-height: 500px; overflow-y: auto;">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- HEATMAP SECTION -->
+                <div id="section-heatmap" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>🔥 Incident Heatmap (24 Hours)</h3>
+                        <div id="heatmap-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div class="stat-card danger">
+                                <div class="stat-label">Critical Incidents</div>
+                                <div class="stat-value" id="heatmap-critical">-</div>
+                            </div>
+                            <div class="stat-card warning">
+                                <div class="stat-label">High Risk Areas</div>
+                                <div class="stat-value" id="heatmap-high">-</div>
+                            </div>
+                            <div class="stat-card warning">
+                                <div class="stat-label">Medium Risk</div>
+                                <div class="stat-value" id="heatmap-medium">-</div>
+                            </div>
+                            <div class="stat-card success">
+                                <div class="stat-label">Safe Areas</div>
+                                <div class="stat-value" id="heatmap-safe">-</div>
+                            </div>
+                        </div>
+                        <div id="heatmap-content">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SAFE ZONES SECTION -->
+                <div id="section-zones" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>🗺️ Safe Zones & GeoFences</h3>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Zone Name</th>
+                                        <th>Type</th>
+                                        <th>Location</th>
+                                        <th>Radius</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="zones-table">
+                                    <tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RESPONDERS SECTION -->
+                <div id="section-responders" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>👮 Emergency Responders</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;" id="responders-grid">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- STATISTICS SECTION -->
+                <div id="section-stats" class="section-content" style="display: none;">
+                    <div class="section">
+                        <h3>📈 Dashboard Statistics</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;" id="stats-cards">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SIDE PANEL -->
+    <div class="side-panel" id="side-panel">
+        <div class="panel-header">
+            <h3 id="panel-title">Tourist Details</h3>
+            <button class="panel-close" onclick="closePanel()">✕</button>
+        </div>
+        <div id="panel-content"></div>
+    </div>
+    
+    <!-- MODAL - e-FIR FILING -->
+    <div class="modal" id="modal-efir">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="margin-bottom: 20px;">📋 File e-FIR</h2>
+            <form onsubmit="submitEFIR(event)">
+                <input type="hidden" id="efir-tourist-id">
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tourist Name</label>
+                    <input type="text" id="efir-tourist-name" readonly style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f5f5f5;">
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Incident Type *</label>
+                    <select id="efir-type" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">Select incident type...</option>
+                        <option value="Theft">🚨 Theft/Robbery</option>
+                        <option value="Accident">🚑 Accident/Injury</option>
+                        <option value="Harassment">⚠️ Harassment/Assault</option>
+                        <option value="Lost">🔍 Lost/Missing Items</option>
+                        <option value="Fraud">💼 Fraud/Scam</option>
+                        <option value="Other">📝 Other</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Description *</label>
+                    <textarea id="efir-description" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; height: 100px; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Witnesses</label>
+                    <input type="text" id="efir-witnesses" placeholder="Names of witnesses (optional)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">📤 File e-FIR</button>
+                    <button type="button" class="btn" style="flex: 1; background: #ccc;" onclick="closeModal('modal-efir')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MODAL - ASSIGN HELP/RESPONDER -->
+    <div class="modal" id="modal-assign-help">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="margin-bottom: 20px;">🚨 Assign Help</h2>
+            <form onsubmit="submitAssignHelp(event)">
+                <input type="hidden" id="help-tourist-id">
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Tourist Name</label>
+                    <input type="text" id="help-tourist-name" readonly style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f5f5f5;">
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Emergency Type *</label>
+                    <select id="help-type" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">Select emergency type...</option>
+                        <option value="police">🚔 Police</option>
+                        <option value="medical">🏥 Medical Help</option>
+                        <option value="fire">🚒 Fire Department</option>
+                        <option value="rescue">🛟 Rescue Team</option>
+                        <option value="escort">👮 Escort/Guide</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Priority Level *</label>
+                    <select id="help-priority" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="high">🔴 High (Life Threatening)</option>
+                        <option value="medium">🟡 Medium (Urgent)</option>
+                        <option value="low">🟢 Low (Non-Urgent)</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Additional Notes</label>
+                    <textarea id="help-notes" placeholder="Any additional information..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; height: 80px; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-danger" style="flex: 1;">🚨 Assign Help Now</button>
+                    <button type="button" class="btn" style="flex: 1; background: #ccc;" onclick="closeModal('modal-assign-help')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MODAL - LOCATION HISTORY -->
+    <div class="modal" id="modal-location-history">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 style="margin-bottom: 20px;">📍 Location History - <span id="history-tourist-name"></span></h2>
+            <div id="location-history-content" style="max-height: 500px; overflow-y: auto;">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('modal-location-history')">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- GENERAL MODAL -->
+    <div class="modal" id="modal">
+        <div class="modal-content" id="modal-content"></div>
+    </div>
+    
+    <script>
+        // Global state
+        let map = null;
+        let tourists = [];
+        let geozones = [];
+        let markers = {};
+        let geozoneLayers = [];
+        let riskZoneLayers = [];
+        let showGeozones = true;
+        let showRiskZones = true;
+        
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initMap();
+            loadStats();
+            loadRecentAlerts();
+            setInterval(refreshData, 5000);
+        });
+        
+        // Initialize Google Map
+        function initMap() {
+            const mapElement = document.getElementById('map');
+            map = new google.maps.Map(mapElement, {
+                zoom: 13,
+                center: { lat: 22.5726, lng: 88.3639 },
+                styles: [
+                    { elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+                    { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] }
+                ]
+            });
+            
+            // Load geozones from context
+            const geozonesJson = `{{ geozones_json|safe }}`;
+            if (geozonesJson && geozonesJson !== '{{ geozones_json|safe }}') {
+                try {
+                    geozones = JSON.parse(geozonesJson);
+                    console.log('[MAP] Loaded ' + geozones.length + ' geozones from context');
+                    drawGeozones();
+                } catch(e) {
+                    console.log('No geozones in context');
+                }
+            }
+            
+            // Load tourist markers first time
+            loadTouristMarkers();
+            // Load predictive risks from ML model
+            loadPredictiveRisks();
+        }
+        
+        // Load tourist markers and update map
+        async function loadTouristMarkers() {
+            try {
+                const response = await fetch('/portal/api/tourists/live/');
+                const data = await response.json();
+                
+                if (data.tourists) {
+                    tourists = data.tourists;
+                    updateMarkers();
+                }
+            } catch(error) {
+                console.error('Error loading tourists:', error);
+            }
+        }
+        
+        // Update markers on map
+        function updateMarkers() {
+            // Remove old markers
+            Object.values(markers).forEach(m => m.setMap(null));
+            markers = {};
+            
+            tourists.forEach(tourist => {
+                const lat = tourist.last_location?.lat;
+                const lon = tourist.last_location?.lon;
+                
+                if (lat && lon) {
+                    const isAlert = tourist.status === 'alert';
+                    const marker = new google.maps.Marker({
+                        position: { lat: parseFloat(lat), lng: parseFloat(lon) },
+                        map: map,
+                        title: tourist.username,
+                        icon: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isAlert ? '%23f1416c' : '%2311998e'}" width="40" height="40"><circle cx="12" cy="12" r="12"/><text x="12" y="16" text-anchor="middle" font-size="14" font-weight="bold" fill="white">${isAlert ? '!' : '✓'}</text></svg>`
+                    });
+                    
+                    marker.addListener('click', () => showTouristPanel(tourist));
+                    markers[tourist.id] = marker;
+                }
+            });
+        }
+        
+        // Draw geozones on map with color coding by risk level
+        function drawGeozones() {
+            geozoneLayers.forEach(layer => layer.setMap(null));
+            geozoneLayers = [];
+            
+            geozones.forEach(zone => {
+                // Color code by zone type: Red = High Risk, Yellow = Medium Risk, Green = Low Risk
+                let zoneColor = '#FF6B6B';  // Red - default high risk
+                let strokeColor = '#c92a2a';
+                let zoneLabel = 'Restricted Area';
+                
+                if (zone.zone_type && zone.zone_type.toLowerCase().includes('low')) {
+                    zoneColor = '#51CF66';  // Green
+                    strokeColor = '#2f9e44';
+                    zoneLabel = 'Low Risk Zone';
+                } else if (zone.zone_type && zone.zone_type.toLowerCase().includes('medium')) {
+                    zoneColor = '#FFD93D';  // Yellow
+                    strokeColor = '#f59f00';
+                    zoneLabel = 'Medium Risk Zone';
+                } else if (zone.zone_type && zone.zone_type.toLowerCase().includes('high')) {
+                    zoneColor = '#FF6B6B';  // Red
+                    strokeColor = '#c92a2a';
+                    zoneLabel = 'High Risk Zone';
+                } else {
+                    zoneColor = '#FF6B6B';  // Red - default
+                    strokeColor = '#c92a2a';
+                    zoneLabel = zone.zone_type || 'Restricted Area';
+                }
+                
+                const circle = new google.maps.Circle({
+                    center: { lat: parseFloat(zone.lat), lng: parseFloat(zone.lon) },
+                    radius: parseFloat(zone.radius),
+                    map: showGeozones ? map : null,
+                    strokeColor: strokeColor,
+                    strokeOpacity: 0.8,
+                    strokeWeight: 3,
+                    fillColor: zoneColor,
+                    fillOpacity: 0.15
+                });
+                
+                circle.addListener('click', function(event) {
+                    new google.maps.InfoWindow({
+                        content: `<div style="padding: 10px; font-weight: bold;"><strong>${zone.name}</strong><br/><small>${zoneLabel}</small><br/><small>${(zone.radius / 1000).toFixed(2)} km radius</small></div>`,
+                        position: event.latLng
+                    }).open(map);
+                });
+                
+                geozoneLayers.push(circle);
+            });
+            
+            console.log(`[GEOZONES] Drew ${geozoneLayers.length} geozones on map`);
+        }
+        
+        // Load and draw predictive risk zones from ML model
+    async function loadPredictiveRisks() {
+    try {
+        console.log('[RISK] Loading predictive risk zones from ML model');
+
+        const response = await fetch('/api/predict-risk-zones/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        console.log('[RISK] Response:', data);
+
+        if (data.predicted_hotspots && data.predicted_hotspots.length > 0) {
+            drawRiskZones(data.predicted_hotspots);
+        } else {
+            console.log('[RISK] No predictive risk zones available');
+        }
+    } catch(error) {
+        console.error('[RISK] Error loading predictions:', error);
+    }
+}
+        
+        // Draw risk prediction zones on map
+        function drawRiskZones(risks) {
+            riskZoneLayers.forEach(layer => layer.setMap(null));
+            riskZoneLayers = [];
+            
+            risks.forEach(risk => {
+                // Color code by risk score: Red = Critical, Orange = High, Yellow = Medium, Green = Low
+                let riskColor = '#11998e';  // Green - default low risk
+                let strokeColor = '#0d7377';
+                let riskLabel = 'Low Risk';
+                
+                if (risk.risk_score >= 80) {
+                    riskColor = '#f1416c';  // Deep Red - Critical
+                    strokeColor = '#c92a2a';
+                    riskLabel = '🔴 CRITICAL RISK';
+                } else if (risk.risk_score >= 60) {
+                    riskColor = '#ff9a56';  // Orange - High
+                    strokeColor = '#e67700';
+                    riskLabel = '🟠 HIGH RISK';
+                } else if (risk.risk_score >= 40) {
+                    riskColor = '#FFD93D';  // Yellow - Medium
+                    strokeColor = '#f59f00';
+                    riskLabel = '🟡 MEDIUM RISK';
+                } else {
+                    riskColor = '#51CF66';  // Green - Low
+                    strokeColor = '#2f9e44';
+                    riskLabel = '🟢 LOW RISK';
+                }
+                
+                const circle = new google.maps.Circle({
+                    center: { lat: parseFloat(risk.lat || 22.5726), lng: parseFloat(risk.lon || 88.3639) },
+                    radius: risk.radius || 500,
+                    map: showRiskZones ? map : null,
+                    strokeColor: strokeColor,
+                    strokeOpacity: 0.9,
+                    strokeWeight: 2,
+                    fillColor: riskColor,
+                    fillOpacity: 0.2,
+                    zIndex: 10
+                });
+                
+                circle.addListener('click', function(event) {
+                    new google.maps.InfoWindow({
+                        content: `<div style="padding: 10px; font-weight: bold;">
+                            <strong>${riskLabel}</strong><br/>
+                            <small>Risk Score: ${risk.risk_score.toFixed(1)}/100</small><br/>
+                            <small>Reason: ${risk.reason || 'ML Prediction'}</small><br/>
+                            <small>Updated: ${new Date(risk.timestamp || Date.now()).toLocaleTimeString()}</small>
+                        </div>`,
+                        position: event.latLng
+                    }).open(map);
+                });
+                
+                riskZoneLayers.push(circle);
+            });
+            
+            console.log(`[RISK] Drew ${riskZoneLayers.length} risk prediction zones on map`);
+        }
+        
+        // Toggle geozones visibility
+        function toggleGeozones() {
+            showGeozones = !showGeozones;
+            geozoneLayers.forEach(layer => layer.setMap(showGeozones ? map : null));
+        }
+        
+        // Toggle risk zones visibility
+        function toggleRiskZones() {
+            showRiskZones = !showRiskZones;
+            riskZoneLayers.forEach(layer => layer.setMap(showRiskZones ? map : null));
+        }
+        
+        // Center map
+        function centerMap() {
+            map.setCenter({ lat: 22.5726, lng: 88.3639 });
+        }
+        
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch('/portal/api/activity-stats/');
+                const stats = await response.json();
+                
+                document.getElementById('stat-active-tourists').textContent = stats.active_tourists || 0;
+                document.getElementById('stat-sos').textContent = stats.active_sos || 0;
+                document.getElementById('stat-alerts').textContent = stats.recent_alerts_24h || 0;
+                document.getElementById('stat-safe').textContent = stats.safe_tourists || 0;
+            } catch(error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        // Load recent alerts
+        async function loadRecentAlerts() {
+            try {
+                const response = await fetch('/portal/api/alert-history/?limit=10');
+                const data = await response.json();
+                
+                const container = document.getElementById('recent-alerts');
+                if (data.alerts && data.alerts.length > 0) {
+                    container.innerHTML = data.alerts.map(alert => `
+                        <div class="alert-item ${alert.status === 'active' ? 'danger' : ''}">
+                            <div class="alert-header">
+                                <span class="alert-user">${alert.user}</span>
+                                <span class="alert-type">${alert.type}</span>
+                            </div>
+                            <div class="alert-details">${alert.details || 'No details'}</div>
+                            <div class="alert-time">${new Date(alert.timestamp).toLocaleTimeString()}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No recent alerts</p>';
+                }
+            } catch(error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+        
+        // Load all alerts
+        async function loadAllAlerts() {
+            try {
+                const response = await fetch('/portal/api/alert-history/?limit=100');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('alerts-table');
+                if (data.alerts && data.alerts.length > 0) {
+                    tbody.innerHTML = data.alerts.map(alert => `
+                        <tr onclick="showAlertDetails(${alert.id})">
+                            <td>${alert.user}</td>
+                            <td><span class="badge badge-warning">${alert.type}</span></td>
+                            <td><span class="badge ${alert.status === 'active' ? 'badge-danger' : 'badge-success'}">${alert.status.toUpperCase()}</span></td>
+                            <td>${new Date(alert.timestamp).toLocaleTimeString()}</td>
+                            <td>${alert.details || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No alerts found</td></tr>';
+                }
+            } catch(error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+        
+        // Load tourists
+        async function loadTourists() {
+            try {
+                const response = await fetch('/portal/api/tourists/live/');
+                const data = await response.json();
+                
+                const tbody = document.getElementById('tourists-table');
+                if (data.tourists && data.tourists.length > 0) {
+                    tbody.innerHTML = data.tourists.map(tourist => `
+                        <tr onclick="showTouristPanel(${JSON.stringify(tourist).replace(/"/g, '&quot;')})">
+                            <td><strong>${tourist.username}</strong></td>
+                            <td>${tourist.phone_number || '-'}</td>
+                            <td>${tourist.safety_score || '-'}</td>
+                            <td>${tourist.last_location?.lat?.toFixed(4)}, ${tourist.last_location?.lon?.toFixed(4)}</td>
+                            <td><span class="badge ${tourist.status === 'alert' ? 'badge-danger' : 'badge-success'}">${tourist.status.toUpperCase()}</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No tourists found</td></tr>';
+                }
+            } catch(error) {
+                console.error('Error loading tourists:', error);
+            }
+        }
+        
+        // Load audit logs
+        async function loadLogs() {
+            try {
+                const response = await fetch('/portal/api/audit-logs/');
+                const data = await response.json();
+                
+                const container = document.getElementById('logs-list');
+                if (data.logs && data.logs.length > 0) {
+                    container.innerHTML = '<div class="table-responsive"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Resource</th><th>Status</th></tr></thead><tbody>' +
+                        data.logs.map(log => `
+                            <tr>
+                                <td>${log.time}</td>
+                                <td>${log.user}</td>
+                                <td>${log.action}</td>
+                                <td>${log.resource}</td>
+                                <td><span class="badge badge-success">${log.status}</span></td>
+                            </tr>
+                        `).join('') +
+                        '</tbody></table></div>';
+                } else {
+                    container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No logs found</p>';
+                }
+            } catch(error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+        
+        // Show section
+        function showSection(section) {
+            document.querySelectorAll('.section-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`section-${section}`).style.display = 'block';
+            event.target.classList.add('active');
+            
+            if (section === 'alerts') loadAllAlerts();
+            if (section === 'tourists') loadTourists();
+            if (section === 'logs') loadLogs();
+            if (section === 'sos') loadSOSAlerts();
+            if (section === 'heatmap') loadHeatmapData();
+            if (section === 'zones') loadZonesData();
+            if (section === 'responders') loadRespondersData();
+            if (section === 'stats') loadDashboardStats();
+        }
+        
+        // Load SOS alerts
+        async function loadSOSAlerts() {
+            try {
+                const response = await fetch('/portal/api/alert-history/?type=SOS&limit=50');
+                const data = await response.json();
+                
+                const container = document.getElementById('sos-alerts');
+                if (data.alerts && data.alerts.length > 0) {
+                    container.innerHTML = data.alerts.filter(a => a.status === 'active').map(alert => `
+                        <div class="alert-item danger">
+                            <div class="alert-header">
+                                <span class="alert-user">${alert.user}</span>
+                                <span class="alert-type">🚨 SOS</span>
+                            </div>
+                            <div class="alert-details"><strong>Location:</strong> ${alert.location?.lat?.toFixed(4)}, ${alert.location?.lon?.toFixed(4)}</div>
+                            <div class="alert-time">${new Date(alert.timestamp).toLocaleTimeString()}</div>
+                            <button class="btn btn-danger" style="width: 100%; margin-top: 8px; font-size: 12px;" onclick="openAssignHelpModal(0, '${alert.user}')">
+                                📍 Send Help
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">✅ No active SOS alerts</p>';
+                }
+            } catch(error) {
+                console.error('Error loading SOS alerts:', error);
+            }
+        }
+        
+        // Load heatmap data
+        async function loadHeatmapData() {
+            try {
+                const response = await fetch('/portal/api/alert-history/?limit=200');
+                const data = await response.json();
+                
+                // Calculate stats
+                const critical = data.alerts?.filter(a => a.type === 'SOS').length || 0;
+                const high = data.alerts?.filter(a => a.type === 'GeoFence').length || 0;
+                const medium = data.alerts?.filter(a => a.type === 'Risk').length || 0;
+                const safe = (data.alerts?.length || 0) - critical - high - medium;
+                
+                document.getElementById('heatmap-critical').textContent = critical;
+                document.getElementById('heatmap-high').textContent = high;
+                document.getElementById('heatmap-medium').textContent = medium;
+                document.getElementById('heatmap-safe').textContent = safe;
+                
+                const html = `
+                    <p style="color: #333; margin-bottom: 15px;"><strong>Incident Distribution (24h):</strong></p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                        <div style="padding: 15px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #f1416c;">
+                            <strong>Critical Areas (SOS)</strong>
+                            <div style="font-size: 24px; margin-top: 10px; color: #f1416c;">${critical}</div>
+                            <small style="color: #666;">Life-threatening incidents</small>
+                        </div>
+                        <div style="padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ff9a56;">
+                            <strong>High Risk Areas</strong>
+                            <div style="font-size: 24px; margin-top: 10px; color: #ff9a56;">${high}</div>
+                            <small style="color: #666;">GeoFence violations detected</small>
+                        </div>
+                        <div style="padding: 15px; background: #e2e3e5; border-radius: 8px; border-left: 4px solid #ffc107;">
+                            <strong>Medium Risk Areas</strong>
+                            <div style="font-size: 24px; margin-top: 10px; color: #ffc107;">${medium}</div>
+                            <small style="color: #666;">Risk alerts triggered</small>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #11998e;">
+                        <strong>✅ Safe Zone Coverage: ${safe}</strong>
+                        <small style="color: #666; display: block; margin-top: 5px;">Tourists in safe/monitored areas</small>
+                    </div>
+                `;
+                
+                document.getElementById('heatmap-content').innerHTML = html;
+            } catch(error) {
+                console.error('Error loading heatmap:', error);
+            }
+        }
+        
+        // Load zones data
+        async function loadZonesData() {
+            try {
+                const tbody = document.getElementById('zones-table');
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;"><div class="loading"><div class="spinner"></div></div></td></tr>`;
+                
+                // Geozones are already loaded in the global geozones variable
+                if (geozones && geozones.length > 0) {
+                    tbody.innerHTML = geozones.map(zone => `
+                        <tr>
+                            <td><strong>${zone.name}</strong></td>
+                            <td><span class="badge ${zone.zone_type?.toLowerCase().includes('high') ? 'badge-danger' : 'badge-warning'}">${zone.zone_type}</span></td>
+                            <td>${Number(zone.lat).toFixed(4)}, ${Number(zone.lon).toFixed(4)}</td>
+                            <td>${(zone.radius / 1000).toFixed(2)} km</td>
+                            <td><span class="badge badge-success">Active</span></td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No zones configured</td></tr>';
+                }
+            } catch(error) {
+                console.error('Error loading zones:', error);
+            }
+        }
+        
+        // Load responders data
+        async function loadRespondersData() {
+            try {
+                const responders = [
+                    { name: 'Officer Sharma', phone: '+91-9876543210', status: 'On Duty', area: 'Zone A', alerts: 3 },
+                    { name: 'Constable Kumar', phone: '+91-9876543211', status: 'On Duty', area: 'Zone B', alerts: 1 },
+                    { name: 'Inspector Patel', phone: '+91-9876543212', status: 'Responding', area: 'Zone C', alerts: 5 },
+                    { name: 'Rescue Team Alpha', phone: '+91-9876543213', status: 'Available', area: 'Zone D', alerts: 0 },
+                ];
+                
+                const html = responders.map(r => `
+                    <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-weight: bold; margin-bottom: 8px;">${r.name}</div>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                            <span class="badge ${r.status === 'On Duty' ? 'badge-success' : 'badge-warning'}">${r.status}</span>
+                        </div>
+                        <small style="display: block; color: #999; margin-bottom: 3px;">📍 ${r.area}</small>
+                        <small style="display: block; color: #999; margin-bottom: 8px;">☎️ ${r.phone}</small>
+                        <div style="font-size: 11px; background: #f5f5f5; padding: 5px 8px; border-radius: 4px;">
+                            <strong>${r.alerts}</strong> active alerts assigned
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('responders-grid').innerHTML = html;
+            } catch(error) {
+                console.error('Error loading responders:', error);
+            }
+        }
+        
+        // Load dashboard stats
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch('/portal/api/activity-stats/');
+                const stats = await response.json();
+                
+                const html = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total Tourists</div>
+                        <div class="stat-value">${stats.total_tourists || 0}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Now</div>
+                        <div class="stat-value">${stats.active_tourists || 0}</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-label">Safe Tourists</div>
+                        <div class="stat-value">${stats.safe_tourists || 0}</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-label">Active SOS</div>
+                        <div class="stat-value">${stats.active_sos || 0}</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-label">Alerts (24h)</div>
+                        <div class="stat-value">${stats.recent_alerts_24h || 0}</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-label">GeoFence Violations</div>
+                        <div class="stat-value">${stats.geofence_violations || 0}</div>
+                    </div>
+                `;
+                
+                document.getElementById('stats-cards').innerHTML = html;
+            } catch(error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        // Trigger SOS
+        function triggerSOS() {
+            if (confirm('⚠️ Are you sure you want to trigger an EMERGENCY SOS alert?\n\nThis will immediately dispatch all available emergency responders!')) {
+                alert('🚨 SOS ALERT TRIGGERED!\n\nEmergency responders are being dispatched to your location.\n\nAn operator will contact you shortly.');
+                // In production, this would call the API
+            }
+        }
+        
+        // Show tourist panel
+        async function showTouristPanel(tourist) {
+            try {
+                const response = await fetch(`/portal/api/tourist-profile/${tourist.id}/`);
+                const profile = await response.json();
+                
+                const isAlert = tourist.status === 'alert';
+                document.getElementById('panel-title').textContent = tourist.username;
+                document.getElementById('panel-content').innerHTML = `
+                    <div class="panel-section">
+                        <div style="padding: 15px; background: ${isAlert ? '#f8d7da' : '#d4edda'}; border-radius: 6px; margin-bottom: 15px;">
+                            <strong style="color: ${isAlert ? '#f1416c' : '#11998e'};">${isAlert ? '⚠️ ALERT - NEEDS HELP' : '✅ SAFE'}</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="panel-label">Personal Info</div>
+                        <div class="panel-value"><strong>Phone:</strong> <a href="tel:${profile.phone_number}" style="color: #667eea;">${profile.phone_number || 'N/A'}</a></div>
+                        <div class="panel-value"><strong>Email:</strong> ${profile.email || 'N/A'}</div>
+                        <div class="panel-value"><strong>Emergency Contact:</strong> ${profile.emergency_contact || 'N/A'}</div>
+                        <div class="panel-value"><strong>Safety Score:</strong> <span style="font-weight: bold; color: ${profile.safety_score > 70 ? '#11998e' : profile.safety_score > 40 ? '#ff9a56' : '#f1416c'};">${profile.safety_score || 'N/A'}</span></div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="panel-label">Current Location</div>
+                        <div class="panel-value">${tourist.last_location?.lat?.toFixed(4)}, ${tourist.last_location?.lon?.toFixed(4)}</div>
+                        <button class="btn btn-primary" style="width: 100%; margin-top: 8px; font-size: 12px;" onclick="showLocationHistory(${tourist.id}, '${tourist.username}')">📍 View Location History</button>
+                    </div>
+                    
+                    <div class="panel-section">
+                        ${profile.recent_alerts && profile.recent_alerts.length > 0 ? `
+                            <div class="panel-label">Recent Alerts (${profile.recent_alerts.length})</div>
+                            ${profile.recent_alerts.slice(0, 5).map(alert => `
+                                <div style="padding: 8px; background: #f5f5f5; margin-bottom: 8px; border-radius: 4px;">
+                                    <span class="badge ${alert.type.includes('SOS') ? 'badge-danger' : 'badge-warning'}">${alert.type}</span>
+                                    <small style="color: #666;">${new Date(alert.timestamp).toLocaleTimeString()}</small>
+                                </div>
+                            `).join('')}
+                        ` : '<p style="color: #999; font-size: 12px;">No recent alerts</p>'}
+                    </div>
+                    
+                    <div class="panel-section">
+                        ${profile.itinerary && Object.keys(profile.itinerary).length > 0 ? `
+                            <div class="panel-label">📅 Itinerary</div>
+                            ${Object.entries(profile.itinerary).slice(0, 5).map(([day, activities]) => `
+                                <div style="padding: 8px; background: #f5f5f5; margin-bottom: 8px; border-radius: 4px;">
+                                    <strong style="font-size: 12px;">${day}</strong>
+                                    <div style="font-size: 12px; color: #666;">${Array.isArray(activities) ? activities.map(a => a.activity || a.time + ' - ' + a.activity).join(', ') : activities}</div>
+                                </div>
+                            `).join('')}
+                        ` : '<p style="color: #999; font-size: 12px;">No itinerary data</p>'}
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                        <button class="btn btn-danger" style="font-size: 12px;" onclick="openAssignHelpModal(${tourist.id}, '${tourist.username}')">
+                            🚨 Assign Help
+                        </button>
+                        <button class="btn btn-primary" style="font-size: 12px; background: #ff9a56;" onclick="openEFIRModal(${tourist.id}, '${tourist.username}')">
+                            📋 File e-FIR
+                        </button>
+                    </div>
+                `;
+                
+                document.getElementById('side-panel').classList.add('active');
+            } catch(error) {
+                console.error('Error loading tourist profile:', error);
+            }
+        }
+        
+        // Open e-FIR modal
+        function openEFIRModal(touristId, touristName) {
+            document.getElementById('efir-tourist-id').value = touristId;
+            document.getElementById('efir-tourist-name').value = touristName;
+            document.getElementById('modal-efir').classList.add('active');
+        }
+        
+        // Open assign help modal
+        function openAssignHelpModal(touristId, touristName) {
+            document.getElementById('help-tourist-id').value = touristId;
+            document.getElementById('help-tourist-name').value = touristName;
+            document.getElementById('modal-assign-help').classList.add('active');
+        }
+        
+        // Submit e-FIR
+        async function submitEFIR(event) {
+            event.preventDefault();
+            
+            const touristId = document.getElementById('efir-tourist-id').value;
+            const incidentType = document.getElementById('efir-type').value;
+            const description = document.getElementById('efir-description').value;
+            const witnesses = document.getElementById('efir-witnesses').value;
+            
+            try {
+                const response = await fetch('/portal/api/efir/file/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        tourist_id: parseInt(touristId),
+                        incident_type: incidentType,
+                        description: description,
+                        witnesses: witnesses ? witnesses.split(',').map(w => w.trim()) : []
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`✅ e-FIR filed successfully!\ne-FIR #: ${data.efir_number}`);
+                    closeModal('modal-efir');
+                    document.querySelector('form').reset();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to file e-FIR'));
+                }
+            } catch(error) {
+                alert('Error filing e-FIR: ' + error.message);
+            }
+        }
+        
+        // Submit assign help
+        async function submitAssignHelp(event) {
+            event.preventDefault();
+            
+            const touristId = document.getElementById('help-tourist-id').value;
+            const helpType = document.getElementById('help-type').value;
+            const priority = document.getElementById('help-priority').value;
+            const notes = document.getElementById('help-notes').value;
+            
+            try {
+                const response = await fetch(`/portal/api/assign-help/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        tourist_id: parseInt(touristId),
+                        help_type: helpType,
+                        priority: priority,
+                        notes: notes
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`✅ Help assigned successfully!\nResponder: ${data.responder_name}\nPhone: ${data.responder_phone}\nETA: ${data.eta || '5-10 minutes'}`);
+                    closeModal('modal-assign-help');
+                    document.querySelector('#modal-assign-help form').reset();
+                    refreshData();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to assign help'));
+                }
+            } catch(error) {
+                alert('Error assigning help: ' + error.message);
+            }
+        }
+        
+        // Show location history
+        async function showLocationHistory(touristId, touristName) {
+            try {
+                document.getElementById('history-tourist-name').textContent = touristName;
+                document.getElementById('location-history-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+                
+                const response = await fetch(`/portal/api/location-history/${touristId}/`);
+                const data = await response.json();
+                
+                if (data.locations && data.locations.length > 0) {
+                    const html = `
+                        <div style="max-height: 450px; overflow-y: auto;">
+                            ${data.locations.slice().reverse().map((loc, idx) => `
+                                <div style="padding: 12px; border-bottom: 1px solid #eee;">
+                                    <div style="font-weight: bold; color: #333;">#${data.locations.length - idx}</div>
+                                    <small style="color: #666;">
+                                        <strong>Location:</strong> ${Number(loc.lat).toFixed(4)}, ${Number(loc.lon).toFixed(4)}<br/>
+                                        <strong>Time:</strong> ${new Date(loc.timestamp || Date.now()).toLocaleTimeString()}<br/>
+                                        ${loc.altitude ? `<strong>Altitude:</strong> ${loc.altitude}m` : ''}
+                                    </small>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    document.getElementById('location-history-content').innerHTML = html;
+                } else {
+                    document.getElementById('location-history-content').innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No location history available</p>';
+                }
+            } catch(error) {
+                document.getElementById('location-history-content').innerHTML = '<p style="color: red;">Error loading location history</p>';
+            }
+            
+            document.getElementById('modal-location-history').classList.add('active');
+        }
+        
+        // Show alert details
+        async function showAlertDetails(alertId) {
+            try {
+                const response = await fetch(`/portal/api/alert-details/${alertId}/`);
+                const alert = await response.json();
+                
+                document.getElementById('modal-content').innerHTML = `
+                    <h2>${alert.alert_type}</h2>
+                    <div style="margin-top: 20px;">
+                        <h4>Tourist Info</h4>
+                        <p><strong>Name:</strong> ${alert.user.username}</p>
+                        <p><strong>Phone:</strong> ${alert.user.phone}</p>
+                        <p><strong>Emergency:</strong> ${alert.user.emergency_contact}</p>
+                        
+                        <h4 style="margin-top: 15px;">Alert Details</h4>
+                        <p><strong>Status:</strong> ${alert.status}</p>
+                        <p><strong>Location:</strong> ${alert.location.lat.toFixed(4)}, ${alert.location.lon.toFixed(4)}</p>
+                        <p><strong>Time:</strong> ${new Date(alert.timestamp).toLocaleString()}</p>
+                        ${alert.heart_rate ? `<p><strong>Heart Rate:</strong> ${alert.heart_rate} bpm</p>` : ''}
+                        
+                        ${alert.itinerary && Object.keys(alert.itinerary).length > 0 ? `
+                            <h4 style="margin-top: 15px;">Itinerary</h4>
+                            ${Object.entries(alert.itinerary).map(([day, activities]) => `
+                                <p><strong>${day}:</strong> ${Array.isArray(activities) ? activities.map(a => a.activity || a).join(', ') : activities}</p>
+                            `).join('')}
+                        ` : ''}
+                    </div>
+                    <button class="btn btn-primary" style="margin-top: 20px; width: 100%;" onclick="closeModal()">Close</button>
+                `;
+                
+                document.getElementById('modal').classList.add('active');
+            } catch(error) {
+                console.error('Error loading alert details:', error);
+            }
+        }
+        
+        // Assign help
+        async function assignHelp(touristId) {
+            // This would call the actual assign-responder API
+            alert('Help has been assigned to the nearest responder!');
+            closePanel();
+        }
+        
+        // Close panel
+        function closePanel() {
+            document.getElementById('side-panel').classList.remove('active');
+        }
+        
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId || 'modal').classList.remove('active');
+        }
+        
+        // Get CSRF token from cookies
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        // Refresh all data
+        function refreshData() {
+            loadTouristMarkers();
+            loadStats();
+            loadRecentAlerts();
+            loadPredictiveRisks();  // Refresh ML predictions
+        }
+        
+        // Logout
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/accounts/logout/';
+            }
+        }
+    </script>
+</body>
+</html>
+
