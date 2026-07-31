@@ -14,6 +14,12 @@ from pathlib import Path
 import os
 
 
+def get_bool_env(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 
 ASGI_APPLICATION = 'backend.asgi.application'
 
@@ -37,12 +43,12 @@ AUTH_USER_MODEL = 'api.CustomUser'
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j!y7mzk))&#9oi0-zmmtf)jpwp(*he)u*w@u5s-pr734jr5&h)'
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-render")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = get_bool_env("DEBUG", False)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 
 # Application definition
@@ -161,7 +167,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # in backend/settings.py
 # --- CELERY SETTINGS ---
-GOOGLE_MAPS_API_KEY = 'AIzaSyDp7n_QVHxPmQ3N8VN26ubQUXxgsIqJnr4'
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 CELERY_BROKER_URL = redis_url
 CELERY_RESULT_BACKEND = redis_url
 CELERY_ACCEPT_CONTENT = ['json']

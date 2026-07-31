@@ -17,9 +17,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY req.txt .
+COPY requirements.render.txt ./requirements.txt
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install -r req.txt
+    pip install -r requirements.txt
 
 # Copy project files
 COPY . .
